@@ -18,8 +18,7 @@ public class ResultCalculator {
     private Set<AbstractClassifier> classifiers;
     Set<Pair<Instances,Instances>> learningToTestInstances;
     private int workers;
-    CVParameterSelection parameterSelection = new CVParameterSelection();
-    Class<? extends ResultSerializer> resultSerializerClass;
+    ResultSerializer resultSerializer;
 
     public void calculateMetrics() {
 
@@ -29,10 +28,17 @@ public class ResultCalculator {
             for (AbstractClassifier classifier : classifiers) {
                 for(Pair<Instances,Instances> classificationPair: learningToTestInstances) {
                     ResultSerializer serializer = new ResultSerializer();
-                    singleRuns.add(new SingleRunCalculator(classifier,classificationPair.getValue(),classificationPair.getKey(),serializer));
+                    singleRuns.add(new SingleRunCalculator(classifier,classificationPair.getValue(),classificationPair.getKey()));
                 }
             }
             List<Future<SingleRunResult>> singleRunResults = executor.invokeAll(singleRuns);
+
+            // serialize results
+            for(Future<SingleRunResult> singleRunResult : singleRunResults){
+                SingleRunResult result = singleRunResult.get();
+                resultSerializer.serialize(result);
+            }
+
         }catch (IOException ioEx) {
             System.out.println("ups, sorry Ciero ... IOException");
             ioEx.printStackTrace();
@@ -51,22 +57,23 @@ public class ResultCalculator {
         private AbstractClassifier classifier;
         private Instances learningData;
         private Evaluation eval;
-        private ResultSerializer serializer;
+        CVParameterSelection parameterSelection = new CVParameterSelection();
 
         public SingleRunCalculator(
                 AbstractClassifier classifier,
                 Instances testData,
-                Instances learningData,
-                ResultSerializer serializer) throws Exception {
+                Instances learningData) throws Exception {
             this.classifier = classifier;
             this.learningData = learningData;
             this.eval = new Evaluation(testData);
-            this.serializer = serializer;
         }
 
         public SingleRunResult call() throws Exception {
+            parameterSelection.setClassifier(classifier);
+            String[] bestParameters = parameterSelection.getBestClassifierOptions();
+            classifier.setOptions(bestParameters);
             classifier.buildClassifier(learningData);
-            return null;
+            return new SingleRunResult(eval.meanAbsoluteError());
         }
     }
 }
