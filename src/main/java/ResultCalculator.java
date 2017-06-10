@@ -73,6 +73,7 @@ public class ResultCalculator {
             String[] bestParameters = parameterSelection.getBestClassifierOptions();
             classifier.setOptions(bestParameters);
             classifier.buildClassifier(learningData);
+            eval.evaluateModel(classifier,eval.getHeader());
             return new SingleRunResult(eval.rootMeanSquaredError());
         }
     }
