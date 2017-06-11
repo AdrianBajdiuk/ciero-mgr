@@ -58,14 +58,20 @@ public class ResultCalculator {
 
             // build all ensemble classifiers
             for (AbstractClassifier singleClassifier : singleClassifiers) {
-                for (Class<? extends AbstractClassifier> classifier : Configuration.getEnsembleClassifiers()) {
-                    ensembleRuns.add(new EnsembleClassifierBuildCallable(singleClassifier, classifier, learningData));
-                }
+                ensembleRuns.add(
+                        new EnsembleClassifierBuildCallable(
+                                singleClassifier,
+                                Configuration.getEnsembleClassifiers(),
+                                learningData));
             }
-            List<Future<AbstractClassifier>> ensembleRunResults = executor.invokeAll(ensembleRuns);
-            Set<AbstractClassifier> allEnsembleClassifiers = new HashSet<AbstractClassifier>();
-            for (Future<AbstractClassifier> builtClassifier : ensembleRunResults) {
-                allEnsembleClassifiers.add(builtClassifier.get());
+            List<Future<Map<AbstractClassifier, Set<AbstractClassifier>>>> ensembleRunResults = executor
+                    .invokeAll(ensembleRuns);
+            Map<AbstractClassifier, Set<AbstractClassifier>> allEnsembleClassifiers = new HashMap<AbstractClassifier, Set<AbstractClassifier>>();
+
+            for (Future<Map<AbstractClassifier, Set<AbstractClassifier>>> builtClassifier : ensembleRunResults) {
+                Map<AbstractClassifier, Set<AbstractClassifier>> t = builtClassifier.get();
+                for (AbstractClassifier i : t.keySet())
+                    allEnsembleClassifiers.put(i, t.get(i));
             }
 
             // test data
@@ -76,7 +82,7 @@ public class ResultCalculator {
                 Set<Integer> selectedInstances = new HashSet<Integer>();
                 while (instances.size() < TEST_DATA_COUNT) {
                     Random generator = new Random();
-                    Integer random = generator.nextInt(TEST_DATA_COUNT);
+                    Integer random = generator.nextInt(testData.size());
                     if (!selectedInstances.contains(random)) {
                         selectedInstances.add(random);
                         instances.add(testData.get(random));
@@ -85,18 +91,22 @@ public class ResultCalculator {
                 testDataInstances.add(instances);
             }
 
-            for (AbstractClassifier simpleClassifier : singleClassifiers) {
+            for (AbstractClassifier simpleClassifier : allEnsembleClassifiers.keySet()) {
                 int counter = 0;
                 for (Instances testInstance : testDataInstances) {
                     counter++;
-                    runCalculators.add(new SingleRunCalculator(counter, simpleClassifier, allEnsembleClassifiers, testInstance));
+                    runCalculators.add(
+                            new SingleRunCalculator(
+                                    counter,
+                                    simpleClassifier,
+                                    allEnsembleClassifiers.get(simpleClassifier),
+                                    testInstance));
                 }
             }
             List<Future<SingleRunResult>> singleRunCalculatorsResult = executor.invokeAll(runCalculators);
 
-
             // serialize results
-                resultSerializer.serialize(singleRunCalculatorsResult);
+            resultSerializer.serialize(singleRunCalculatorsResult);
 
         } catch (InterruptedException iE) {
             System.out.println("ups, sorry Ciero ... Interrupted");
@@ -131,37 +141,44 @@ public class ResultCalculator {
         }
     }
 
-    private class EnsembleClassifierBuildCallable implements Callable<AbstractClassifier> {
+    private class EnsembleClassifierBuildCallable implements Callable<Map<AbstractClassifier, Set<AbstractClassifier>>> {
 
         private AbstractClassifier simpleClassifier;
-        private AbstractClassifier ensembleClassifier;
+        private Set<AbstractClassifier> ensembleClassifiers;
         private Instances learningData;
         private CVParameterSelection parameterSelector;
 
         public EnsembleClassifierBuildCallable(
                 AbstractClassifier simpleClassifier,
-                Class<? extends AbstractClassifier> ensembleClassifier,
+                Set<Class<? extends AbstractClassifier>> ensembleClassifiers,
                 Instances learningData) throws IllegalAccessException, InstantiationException {
             this.simpleClassifier = simpleClassifier;
-            this.ensembleClassifier = ensembleClassifier.newInstance();
+            this.ensembleClassifiers = new HashSet<AbstractClassifier>();
+            for (Class<? extends AbstractClassifier> clazz : ensembleClassifiers) {
+                this.ensembleClassifiers.add(clazz.newInstance());
+            }
             this.learningData = learningData;
             this.parameterSelector = new CVParameterSelection();
         }
 
-        public AbstractClassifier call() throws Exception {
-            if (ensembleClassifier instanceof Stacking) {
-                Classifier[] classifiers = new Classifier[1];
-                classifiers[0] = simpleClassifier;
-                ((Stacking) ensembleClassifier).setClassifiers(classifiers);
-            } else {
-                ((SingleClassifierEnhancer) ensembleClassifier).setClassifier(simpleClassifier);
+        public Map<AbstractClassifier, Set<AbstractClassifier>> call() throws Exception {
+            for (AbstractClassifier classifier : this.ensembleClassifiers) {
+                if (classifier instanceof Stacking) {
+                    Classifier[] classifiers = new Classifier[1];
+                    classifiers[0] = simpleClassifier;
+                    ((Stacking) classifier).setClassifiers(classifiers);
+                } else {
+                    ((SingleClassifierEnhancer) classifier).setClassifier(simpleClassifier);
+                }
+                parameterSelector.setClassifier(classifier);
+                parameterSelector.buildClassifier(learningData);
+                String[] options = parameterSelector.getBestClassifierOptions();
+                classifier.setOptions(options);
+                classifier.buildClassifier(learningData);
             }
-            parameterSelector.setClassifier(ensembleClassifier);
-            parameterSelector.buildClassifier(learningData);
-            String[] options = parameterSelector.getBestClassifierOptions();
-            ensembleClassifier.setOptions(options);
-            ensembleClassifier.buildClassifier(learningData);
-            return this.ensembleClassifier;
+            Map<AbstractClassifier, Set<AbstractClassifier>> result = new HashMap<AbstractClassifier, Set<AbstractClassifier>>();
+            result.put(this.simpleClassifier, this.ensembleClassifiers);
+            return result;
         }
     }
 
@@ -172,7 +189,8 @@ public class ResultCalculator {
         private Instances testData;
         private int probe;
 
-        public SingleRunCalculator(int probe,
+        public SingleRunCalculator(
+                int probe,
                 AbstractClassifier simpleClassifier,
                 Set<AbstractClassifier> ensembleClassifiers,
                 Instances testData) throws Exception {
@@ -190,7 +208,7 @@ public class ResultCalculator {
                 ensembleMeanSquareErrors.put(ensembleClassifier.getClass(), getMeanSquaredError(ensembleClassifier));
             }
 
-            return new SingleRunResult(probe,classifier.getClass(), simpleClassifierError, ensembleMeanSquareErrors);
+            return new SingleRunResult(probe, classifier.getClass(), simpleClassifierError, ensembleMeanSquareErrors);
         }
 
         private Double getMeanSquaredError(AbstractClassifier classifier) throws Exception {

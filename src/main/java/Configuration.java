@@ -16,7 +16,6 @@ import weka.classifiers.trees.M5P;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
-import weka.filters.unsupervised.attribute.RemoveType;
 
 public class Configuration {
 
@@ -78,10 +77,8 @@ public class Configuration {
             int generatedIndex = rand.nextInt(testDataCount);
             double generateProb = rand.nextDouble();
             if (!testDataAdded.contains(generatedIndex)) {
-                RemoveType removeType = new RemoveType();
-                String[] options = new String[1];
                 Instance instance = dataSet.get(generatedIndex);
-                if (generatedIndex <= TEST_DATA_PERCENTAGE) {
+                if (generateProb <= TEST_DATA_PERCENTAGE) {
                     toTestInstances.add(instance);
                     toLearnInstances.remove(generatedIndex);
                     addedTestData++;

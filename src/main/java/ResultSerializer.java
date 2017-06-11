@@ -20,9 +20,20 @@ public class ResultSerializer {
     public void serialize(List<Future<SingleRunResult>> result) throws IOException, ExecutionException, InterruptedException {
 
         FileWriter writer = new FileWriter(outputFileName);
+
+        List<String> row = new LinkedList<String>();
+        row.add("classifier");
+        row.add("probe");
+        row.add("singleClassifier");
+        for (Class<? extends AbstractClassifier> ensemble : result.get(0).get().getEnsembleMeanSquareError().keySet()) {
+            row.add(ensemble.getSimpleName());
+        }
+        //write header row:
+        writeLine(writer,row,DEFAULT_SEPARATOR,' ');
+
         for (Future<SingleRunResult> f : result) {
+            row = new LinkedList<String>();
             SingleRunResult s = f.get();
-            List<String> row = new LinkedList<String>();
             row.add(s.getClassifier().getSimpleName());
             row.add(new Integer(s.getProbe()).toString());
             row.add(new Double(s.getMeanSquareError()).toString());
