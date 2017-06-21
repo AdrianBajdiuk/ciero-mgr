@@ -1,8 +1,10 @@
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -35,7 +37,7 @@ public class ResultSerializer {
             row = new LinkedList<String>();
             SingleRunResult s = f.get();
             row.add(s.getClassifier().getSimpleName());
-            row.add(new Integer(s.getProbe()).toString());
+            row.add(s.getSourceName());
             row.add(new Double(s.getMeanSquareError()).toString());
             for (Class<? extends AbstractClassifier> ensemble : s.getEnsembleMeanSquareError().keySet()) {
                 row.add(new Double(s.getEnsembleMeanSquareError().get(ensemble)).toString());
@@ -47,9 +49,34 @@ public class ResultSerializer {
         writer.close();
     }
 
-    public  void  serializeOptions(String[] options, String classifier){
+   public  void serializeReferenceIterations(Map<Class<? extends AbstractClassifier>, Map<Integer,Double>> referenceMap)
+           throws IOException {
+       File f = new File(outputFileName);
+       File dir = f.getParentFile();
+       String referenceFileName = dir.getPath() + "/reference.csv";
 
-    }
+        FileWriter writer = new FileWriter(referenceFileName);
+
+       List<String> row = new LinkedList<String>();
+       row.add("classifier");
+       row.add("iterations");
+       row.add("rmse");
+
+       //write header row:
+       writeLine(writer,row,DEFAULT_SEPARATOR,' ');
+
+       for (Class clazz : referenceMap.keySet()) {
+           for(Integer i:referenceMap.get(clazz).keySet()) {
+               row = new LinkedList<String>();
+               row.add(clazz.getSimpleName());
+               row.add(i.toString());
+               row.add(referenceMap.get(clazz).get(i).toString());
+               writeLine(writer, row, DEFAULT_SEPARATOR, ' ');
+           }
+       }
+       writer.flush();
+       writer.close();
+   }
 
     private void writeLine(Writer w, List<String> values, char separators, char customQuote) throws IOException {
 

@@ -4,17 +4,17 @@ import weka.classifiers.AbstractClassifier;
 
 public class SingleRunResult {
 
-    private int probe;
+    private String sourceName;
     private Class<? extends AbstractClassifier> classifier;
     private double meanSquareError;
     private Map<Class<? extends AbstractClassifier>,Double> ensembleMeanSquareErrors;
 
-    public SingleRunResult(int probe,
+    public SingleRunResult(String probe,
             Class<? extends AbstractClassifier> classifier,double meanSquareError, Map<Class<? extends AbstractClassifier>, Double> ensembleMeanSquareErrors) {
         this.meanSquareError = meanSquareError;
         this.ensembleMeanSquareErrors = ensembleMeanSquareErrors;
         this.classifier = classifier;
-        this.probe = probe;
+        this.sourceName = probe;
     }
 
     public double getMeanSquareError() {
@@ -25,8 +25,8 @@ public class SingleRunResult {
         return ensembleMeanSquareErrors;
     }
 
-    public int getProbe() {
-        return probe;
+    public String getSourceName() {
+        return sourceName;
     }
 
     public Class<? extends AbstractClassifier> getClassifier() {
