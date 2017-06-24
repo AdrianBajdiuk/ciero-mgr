@@ -6,7 +6,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import weka.classifiers.AbstractClassifier;
 
@@ -19,32 +18,32 @@ public class ResultSerializer {
         this.outputFileName = outputFileName;
     }
 
-    public void serialize(List<Future<SingleRunResult>> result) throws IOException, ExecutionException, InterruptedException {
+    public void result(Map<String, Map<Class, Map<Class, Double>>> toSerialize) throws IOException, ExecutionException, InterruptedException {
 
         FileWriter writer = new FileWriter(outputFileName);
 
-        List<String> row = new LinkedList<String>();
-        row.add("classifier");
-        row.add("probe");
-        row.add("singleClassifier");
-        for (Class<? extends AbstractClassifier> ensemble : result.get(0).get().getEnsembleMeanSquareError().keySet()) {
-            row.add(ensemble.getSimpleName());
+        List<String> header = new LinkedList<String>();
+        header.add("classifier");
+        header.add("probe");
+        header.add("single classifier RMSE");
+        for(Class c : Configuration.getEnsembleClassifiers()){
+            header.add(c.getSimpleName() + " RMSE");
         }
         //write header row:
-        writeLine(writer,row,DEFAULT_SEPARATOR,' ');
+        writeLine(writer,header,DEFAULT_SEPARATOR,' ');
 
-        for (Future<SingleRunResult> f : result) {
-            row = new LinkedList<String>();
-            SingleRunResult s = f.get();
-            row.add(s.getClassifier().getSimpleName());
-            row.add(s.getSourceName());
-            row.add(new Double(s.getMeanSquareError()).toString());
-            for (Class<? extends AbstractClassifier> ensemble : s.getEnsembleMeanSquareError().keySet()) {
-                row.add(new Double(s.getEnsembleMeanSquareError().get(ensemble)).toString());
+        for(String souirceName : toSerialize.keySet()){
+            for(Class simpleClass : toSerialize.get(souirceName).keySet()){
+                List<String> row = new LinkedList<String>();
+                row.add(simpleClass.getSimpleName());
+                row.add(souirceName);
+                row.add(toSerialize.get(souirceName).get(simpleClass).get(simpleClass).toString());
+                for(Class e : Configuration.getEnsembleClassifiers()){
+                    row.add(toSerialize.get(souirceName).get(simpleClass).get(e).toString());
+                }
+                writeLine(writer, row, DEFAULT_SEPARATOR, ' ');
             }
-            writeLine(writer,row,DEFAULT_SEPARATOR,' ');
         }
-
         writer.flush();
         writer.close();
     }

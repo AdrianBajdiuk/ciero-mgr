@@ -31,7 +31,6 @@ public class Configuration {
     private static Set<Class<? extends AbstractClassifier>> singleClassifiers;
     private static Set<Class<? extends AbstractClassifier>> ensembleClassifiers;
     private static Class<? extends AbstractClassifier> referenceClassifier;
-
     static {
         executorWorkers = 8;
         iteratorsStartingValue = 25;
@@ -84,7 +83,6 @@ public class Configuration {
                 referenceInstances.setClassIndex(referenceInstances.numAttributes()-1);
             }
         }
-
     }
 
     public Instances getReferenceInstances() {
@@ -106,8 +104,9 @@ public class Configuration {
     public static Set<Class<? extends AbstractClassifier>> getEnsembleClassifiers() {
         return ensembleClassifiers;
     }
-
     public static Class<? extends AbstractClassifier> getReferenceClassifier() {
         return referenceClassifier;
     }
+
+
 }
